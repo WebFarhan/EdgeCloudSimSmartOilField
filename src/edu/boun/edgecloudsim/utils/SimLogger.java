@@ -18,6 +18,7 @@ import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileWriter;
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.LinkedList;
@@ -31,6 +32,7 @@ import com.google.common.collect.ArrayListMultimap;
 
 import edu.boun.edgecloudsim.core.SimManager;
 import edu.boun.edgecloudsim.core.SimSettings;
+import edu.boun.edgecloudsim.edge_client.MobileDeviceManager;
 
 public class SimLogger {
 	public static enum TASK_STATUS {
@@ -51,6 +53,28 @@ public class SimLogger {
 	
 	private HashMap<String, NormDistr> ettDistributions = new HashMap<>();
 	public ETTMatrix ettMatrix;
+	
+	public static double failTaskPercent;
+	public static double toatTasks;
+	public static double result;
+	
+	
+	public double getToatTasks() {
+		return toatTasks;
+	}
+
+	public void setToatTasks(double toatTasks) {
+		SimLogger.toatTasks = toatTasks;
+	}
+
+	public void setFailTaskPercent(double a) {
+		
+		this.failTaskPercent = a;
+	}
+	
+	public double getFailTaskPercent() {
+		return failTaskPercent;
+	}
 	
 	private int dlMisCounter = 0 ;
 	
@@ -573,16 +597,46 @@ public class SimLogger {
 			}
 		}
 
+		//FileWriter fw = new FileWriter("Result.txt",true);
+		//PrintWriter printWriter = new PrintWriter(fw);
+		
+		
 		// printout important results
 		printLine("# of tasks (Cloudlet/Cloud): "
 				+ (failedTask[numOfAppTypes] + completedTask[numOfAppTypes]) + "("
 				+ (failedTaskOnCloudlet[numOfAppTypes] + completedTaskOnCloudlet[numOfAppTypes]) + "/" 
 				+ (failedTaskOnCloud[numOfAppTypes]+ completedTaskOnCloud[numOfAppTypes]) + ")");
 		
+		double tTasks = failedTaskOnCloudlet[numOfAppTypes] + completedTaskOnCloudlet[numOfAppTypes];
+		
+		setToatTasks(tTasks);
+		
+		/*
+		printWriter.println("# of tasks (Cloudlet/Cloud): "
+				+ (failedTask[numOfAppTypes] + completedTask[numOfAppTypes]) + "("
+				+ (failedTaskOnCloudlet[numOfAppTypes] + completedTaskOnCloudlet[numOfAppTypes]) + "/" 
+				+ (failedTaskOnCloud[numOfAppTypes]+ completedTaskOnCloud[numOfAppTypes]) + ")");
+		*/
+		
 		printLine("# of failed tasks (Cloudlet/Cloud): "
 				+ failedTask[numOfAppTypes] + "("
 				+ failedTaskOnCloudlet[numOfAppTypes]
 				+ "/" + failedTaskOnCloud[numOfAppTypes] + ")");
+		
+		
+		
+		double ftp = ((double) failedTask[numOfAppTypes] * (double) 100)/ (double) (completedTask[numOfAppTypes] + failedTask[numOfAppTypes]);
+		
+		setFailTaskPercent(ftp);
+		
+		
+		/*
+		printWriter.println("percentage of failed tasks: "
+				+ String.format("%.6f", ((double) failedTask[numOfAppTypes] * (double) 100)
+						/ (double) (completedTask[numOfAppTypes] + failedTask[numOfAppTypes]))
+				+ "%");
+		
+		*/
 		
 		printLine("# of completed tasks (Cloudlet/Cloud): "
 				+ completedTask[numOfAppTypes] + "("
@@ -633,6 +687,9 @@ public class SimLogger {
 				+ String.format("%.6f", totalVmLoad / (double) vmLoadList.size()) + "%");
 		
 		printLine("average cost: " + cost[numOfAppTypes] / completedTask[numOfAppTypes] + "$");
+		
+		
+		//printWriter.close();
 
 		// clear related collections (map list etc.)
 		taskMap.clear();

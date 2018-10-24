@@ -32,6 +32,7 @@ import org.cloudbus.cloudsim.lists.VmList;
 
 import edu.boun.edgecloudsim.core.SimManager;
 import edu.boun.edgecloudsim.core.SimSettings;
+import edu.boun.edgecloudsim.edge_orchestrator.BasicEdgeOrchestrator;
 import edu.boun.edgecloudsim.edge_server.EdgeVM;
 import edu.boun.edgecloudsim.network.NetworkModel;
 import edu.boun.edgecloudsim.utils.EdgeTask;
@@ -198,6 +199,8 @@ public class MobileDeviceManager extends DatacenterBroker {
 				
 				//SimLogger.printLine(" finish time "+ task.getFinishTime()+" deadline "+(task.getDeadLine()+task.getSubmissionTime()));
 						
+				SimManager.getInstance().getEdgeOrchestrator().deadline(task, SimLogger.getInstance().matrix, 0.0001,BasicEdgeOrchestrator.getRecBS());
+				
 				if(task.getFinishTime()>(task.getDeadLine()+task.getSubmissionTime())) {
 					//setDlMisCounter(dlMisCounter++);
 					SimLogger.getInstance().setDlMisCounter(dlMisCounter++);

@@ -9,6 +9,9 @@
 
 package edu.boun.edgecloudsim.sample_application;
 
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.PrintWriter;
 import java.text.DateFormat;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -29,8 +32,9 @@ public class mainApp {
 	
 	/**
 	 * Creates main() to run this example
+	 * @throws IOException 
 	 */
-	public static void main(String[] args) {
+	public static void main(String[] args) throws IOException {
 		//disable console output of cloudsim library
 		Log.disable();
 		
@@ -42,12 +46,17 @@ public class mainApp {
 		String outputFolder = "";
 		String edgeDevicesFile = "";
 		String applicationsFile = "";
-		if (args.length == 5){
+		ArrayList<Double> allCounters = new ArrayList<>();
+		ArrayList<Double> allTasks = new ArrayList<>();
+		ArrayList<Double> failTasks = new ArrayList<>();
+		
+		
+		if (args.length == 3){
 			configFile = args[0];
 			edgeDevicesFile = args[1];
 			applicationsFile = args[2];
-			outputFolder = args[3];
-			iterationNumber = Integer.parseInt(args[4]);
+			//outputFolder = args[3];
+			//rm iterationNumber = Integer.parseInt(args[4]);
 		}
 		else{
 			SimLogger.printLine("Simulation setting file, output folder and iteration number are not provided! Using default ones...");
@@ -57,6 +66,8 @@ public class mainApp {
 			outputFolder = "sim_results/ite" + iterationNumber;
 		}
 
+		
+		//outputFolder = "/work/razin/AnnaV2I_Fall18/TestOutPut/ite" + iterationNumber;
 		//load settings from configuration file
 		SimSettings SS = SimSettings.getInstance();
 		if(SS.initialize(configFile, edgeDevicesFile, applicationsFile) == false){
@@ -84,17 +95,29 @@ public class mainApp {
 				for(int i=0; i<SS.getOrchestratorPolicies().length; i++)
 				{
 					arrli1 = new ArrayList<Double>(SS.getOrchestratorPolicies().length);
-					for(int loopIndex =0;loopIndex<1;loopIndex++) {
+					
+					
 					
 					String simScenario = SS.getSimulationScenarios()[k];
 					String orchestratorPolicy = SS.getOrchestratorPolicies()[i];
 					Date ScenarioStartDate = Calendar.getInstance().getTime();
 					now = df.format(ScenarioStartDate);
 					
+					FileWriter fw = new FileWriter("Result.txt",true);
+					PrintWriter printWriter = new PrintWriter(fw);
+					
+					
 					SimLogger.printLine("Scenario started at " + now);
-					SimLogger.printLine("Scenario: " + simScenario + " - Policy: " + orchestratorPolicy + " - #iteration: " + loopIndex);
+					SimLogger.printLine("Scenario: " + simScenario + " - Policy: " + orchestratorPolicy + " - #iteration: " + iterationNumber);
 					SimLogger.printLine("Duration: " + SS.getSimulationTime()/3600 + " hour(s) - Poisson: " + SS.getTaskLookUpTable()[0][2] + " - #devices: " + j);
 					SimLogger.getInstance().simStarted(outputFolder,"SIMRESULT_" + simScenario + "_"  + orchestratorPolicy + "_" + j + "DEVICES");
+					
+					printWriter.println("Scenario started at " + now);
+							
+					printWriter.println();
+					
+					
+					for(int loopIndex =0;loopIndex<5;loopIndex++) {
 					
 					try
 					{
@@ -131,11 +154,101 @@ public class mainApp {
 					double d = SimLogger.getInstance().getFailedTask();
 					arrli1.add(d);
 					
-					SimLogger.printLine( " Number failed tasks "+ SimLogger.getInstance().getDlMisCounter());
+					printWriter.println("Total Number of Tasks :"+SimLogger.getInstance().getToatTasks());
+					printWriter.println("Percentage of failed task in EdgeCloudSim : "+SimLogger.getInstance().getFailTaskPercent());
+					
+					SimLogger.printLine("Number failed tasks "+ SimLogger.getInstance().getDlMisCounter());
+					printWriter.println("Number failed tasks "+ SimLogger.getInstance().getDlMisCounter());
+					printWriter.println();
+					printWriter.println("Smart Oil task processing finished!");
+					printWriter.println("*************************************************");
+					
+					
+					double rsPr = (SimLogger.getInstance().getDlMisCounter()/ SimLogger.getInstance().getToatTasks())*100;
+					
+					allCounters.add(SimLogger.getInstance().getFailTaskPercent());
+					
+					allTasks.add(SimLogger.getInstance().getToatTasks());
+					
+					
+					failTasks.add(rsPr);
+					
+					
+					}//simulation loop
+					//SimLogger.printLine(" failed list "+arrli1);
+					//arrli1.clear();
+					
+					int arrSize = failTasks.size();
+					double sumDl = 0;
+					double resultDl =0;
+					
+					for(int m=0;m<arrSize;m++) {
+						sumDl = sumDl + failTasks.get(m);
+						
 					}
-					SimLogger.printLine(" failed list "+arrli1);
-					arrli1.clear();
-				
+					
+					resultDl = (sumDl/arrSize);
+					
+					double stdDl = 0.0;
+					
+					for (int p = 0; p <arrSize; p++)
+					{
+						
+						stdDl += Math.pow((failTasks.get(p) - resultDl), 2) / (arrSize);
+					}
+					
+					double STD = Math.sqrt(stdDl);
+					
+					
+					SimLogger.printLine("Percentage of task failed due to deadline miss "+resultDl);
+										
+					double sizeOfArray = allCounters.size();
+					double sum = 0;
+					double result2 = 0;
+					
+					SimLogger.printLine("Array Size "+ sizeOfArray);
+					
+					for(int x=0;x<sizeOfArray;x++)
+					{
+						sum = sum + allCounters.get(x);
+						
+					}
+					
+					result2 = (sum/sizeOfArray);
+					
+					double sd = 0;
+					for (int indx = 0; indx <sizeOfArray; indx++)
+					{
+						
+					    sd += Math.pow((allCounters.get(indx) - result2), 2) / (sizeOfArray);
+					}
+					double standardDeviation = Math.sqrt(sd);
+					
+					SimLogger.printLine("Average of running simulation : "+ result2);
+					
+					printWriter.println("Scenario: " + simScenario + " - Policy: " + orchestratorPolicy + " - #iteration: " + iterationNumber);
+					printWriter.println("Duration: " + SS.getSimulationTime()/3600 + " hour(s) - Poisson: " + SS.getTaskLookUpTable()[0][2] + " - #devices: " + j);
+					
+					SimLogger.printLine("############# Average of running simulation : "+ result2);
+					SimLogger.printLine("############# Standard Deviation : "+standardDeviation);
+					
+					
+					printWriter.println("Average Percentage of task failed due to deadline miss :"+resultDl);
+					printWriter.println("Standard Deviation in deadline miss data :"+STD);
+					printWriter.println();
+					printWriter.println("############# Failed tasks in simulation loop :"+failTasks);
+					printWriter.println("############# Failed tasks according to EdgeCloudSim in simulation loop :"+allCounters);
+					printWriter.println("############# Average of running simulation : "+ result2);
+					printWriter.println("############# Standard Deviation : "+standardDeviation);
+					
+					printWriter.println();
+					printWriter.close();
+					
+					
+					allCounters.clear();
+					allTasks.clear();
+					failTasks.clear();
+					
 				}//End of orchestrators loop
 			}//End of scenarios loop
 		}//End of mobile devices loop

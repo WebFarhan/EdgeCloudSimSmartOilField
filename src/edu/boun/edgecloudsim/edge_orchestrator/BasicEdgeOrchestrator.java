@@ -41,7 +41,16 @@ public class BasicEdgeOrchestrator extends EdgeOrchestrator {
 	private int lastSelectedHostIndex; //used by load balancer
 	private int[] lastSelectedVmIndexes; //used by each host individually
 	private static Datacenter receivingBS; // !!! IMPORTANT !!! DON'T USE THE METHOD Datacenter.getId(), it's messed up, use recBS instead if u need an index.
-	private int recBS = -1; //Receiving DC ID
+	private static int recBS = -1; //Receiving DC ID
+	
+	public static int getRecBS() {
+		return recBS;
+	}
+
+	public void setRecBS(int recBS) {
+		this.recBS = recBS;
+	}
+
 	private ArrayList<Integer> neighboringBS = new ArrayList<>(); //Neighboring BaseStations
 	
 	private static ETCMatrix matrix;
@@ -156,9 +165,6 @@ public class BasicEdgeOrchestrator extends EdgeOrchestrator {
 
 	public EdgeVM selectVmOnLoadBalancer(Task task){
 		EdgeVM selectedVM = null;
-		//getNeighbors(task);
-		//System.out.print(receivingBS.getId()+ "\n");
-		//EdgeVM selectedVM  = getDC(task);
 		
 		if(policy.equalsIgnoreCase("Probability")) {
 			getNeighbors(task);
@@ -166,9 +172,13 @@ public class BasicEdgeOrchestrator extends EdgeOrchestrator {
 			
 		}
 		else if(policy.equalsIgnoreCase("Baseline")){
-			Location deviceLocation = SimManager.getInstance().getMobilityModel().getLocation(task.getMobileDeviceId(), CloudSim.clock());
-			int relatedHostId=deviceLocation.getServingWlanId();
-			List<EdgeVM> vmArray = SimManager.getInstance().getLocalServerManager().getVmList(relatedHostId);
+			//Location deviceLocation = SimManager.getInstance().getMobilityModel().getLocation(task.getMobileDeviceId(), CloudSim.clock());
+			//int relatedHostId=deviceLocation.getServingWlanId();
+			
+			
+			//List<EdgeVM> vmArray = SimManager.getInstance().getLocalServerManager().getVmList(relatedHostId);
+			
+			List<EdgeVM> vmArray =  receivingBS.getVmList();
 			for(int i = 0; i < vmArray.size(); i++) {
 				double requiredCapacity = ((CpuUtilizationModel_Custom)task.getUtilizationModelCpu()).predictUtilization(vmArray.get(i).getVmType());
 				double targetVmCapacity = (double)100 - vmArray.get(i).getCloudletScheduler().getTotalUtilizationOfCpu(CloudSim.clock());
@@ -179,8 +189,9 @@ public class BasicEdgeOrchestrator extends EdgeOrchestrator {
 		}
 		else if(policy.equalsIgnoreCase("MECT")) {
 			
-			Datacenter dc = SimManager.getInstance().edgeServerManager.getDatacenterList().get(getMectDC(task));
-			List<EdgeVM> vmArrayMect = dc.getVmList();
+			Datacenter dcM = SimManager.getInstance().edgeServerManager.getDatacenterList().get(getMectDC(task));
+			
+			List<EdgeVM> vmArrayMect = dcM.getVmList();
 			for(int i = 0; i < vmArrayMect.size(); i++) {
 				double requiredCapacity = ((CpuUtilizationModel_Custom)task.getUtilizationModelCpu()).predictUtilization(vmArrayMect.get(i).getVmType());
 				double targetVmCapacity = (double)100 - vmArrayMect.get(i).getCloudletScheduler().getTotalUtilizationOfCpu(CloudSim.clock());
@@ -210,8 +221,8 @@ public class BasicEdgeOrchestrator extends EdgeOrchestrator {
 			avgMu += b.getMu(i, task.getTaskType().ordinal());
 		}
 		double avgMuAll = avgMu/b.getDataCnum();
-		double beta = 0.8;
-		double alpha = 0.9;
+		double beta = 0.9;
+		double alpha = 1.0;
 		double deadline =  (beta*avgMuAll)+ slack + submissionTime + alpha*comDelay;
 		task.setDeadLine(deadline);
 		return deadline;
@@ -229,7 +240,7 @@ public class BasicEdgeOrchestrator extends EdgeOrchestrator {
 		}
 		double avgMuAll = avgMu/b.getDataCnum();
 		double beta = 0.8;
-		double alpha = 0.9;
+		double alpha = 1.0;
 		double deadline =  beta*avgMuAll+ slack + submissionTime + alpha*comDelay;
 		task.setDeadLine(deadline);
 		return deadline;
@@ -249,15 +260,7 @@ public class BasicEdgeOrchestrator extends EdgeOrchestrator {
 		
 		//SimLogger.printLine(" Probability in receving DC "+ bestProb);
 		
-		List<EdgeVM> recvmArray = receivingBS.getVmList();
 		
-		for(int j = 0; j < recvmArray.size(); j++) {
-			double requiredCapacity = ((CpuUtilizationModel_Custom)task.getUtilizationModelCpu()).predictUtilization(recvmArray.get(j).getVmType());
-			double targetVmCapacity = (double)100 - recvmArray.get(j).getCloudletScheduler().getTotalUtilizationOfCpu(CloudSim.clock());
-			if(requiredCapacity <= targetVmCapacity) {
-				selectedVM = recvmArray.get(j);
-				}
-		}
 		
 		double[] probContainer = new double[neighboringBS.size()]; 
 		
@@ -270,46 +273,56 @@ public class BasicEdgeOrchestrator extends EdgeOrchestrator {
 			
 			convVariance = Math.pow(matrix.getSigma(neighboringBS.get(i), task.getTaskType().ordinal()),2)+Math.pow(ettmatrix.getSigma(neighboringBS.get(i), task.getTaskType().ordinal()),2);
 			
-			dl1 = deadlineTransfer(task, matrix, 0.0001,recBS,neighboringBS.get(i)); // 
+			dl1 = SimManager.getInstance().getEdgeOrchestrator().deadline(task, matrix, 0.0001,neighboringBS.get(i)); // 
 			double prob; //= matrix.getProbability(neighboringBS.get(i), task.getTaskType().ordinal(), dl1);
 			
 			prob = getConvolveProbability(convMu, Math.sqrt(convVariance), dl1);
 			
 			probContainer[i] = prob;
 			
-			if (prob > bestProb || selectedVM == null) {
-				int dc = neighboringBS.get(i);
-				List<EdgeVM> vmArray = SimManager.getInstance().edgeServerManager.getDatacenterList().get(dc).getVmList();
 				
-				for(int j = 0; j < vmArray.size(); j++) {
-					double requiredCapacity = ((CpuUtilizationModel_Custom)task.getUtilizationModelCpu()).predictUtilization(vmArray.get(j).getVmType());
-					double targetVmCapacity = (double)100 - vmArray.get(j).getCloudletScheduler().getTotalUtilizationOfCpu(CloudSim.clock());
-					if(requiredCapacity <= targetVmCapacity) {
-						selectedVM = vmArray.get(i);
-						}
+		}
+		
+		double temp;
+		
+		for (int i = 0; i < neighboringBS.size(); i++) 
+		{
+			for (int j = i + 1; j < neighboringBS.size(); j++) 
+			{
+				if (probContainer[i] < probContainer[j]) 
+				{
+					temp = probContainer[i];
+					probContainer[i] = probContainer[j];
+					probContainer[j] = temp;
+				}
+			}
+		}
+		
+		if (probContainer[0] > bestProb) {
+			int dc = neighboringBS.get(0);
+			List<EdgeVM> vmArray = SimManager.getInstance().edgeServerManager.getDatacenterList().get(dc).getVmList();
+			
+			for(int j = 0; j < vmArray.size(); j++) {
+				double requiredCapacity = ((CpuUtilizationModel_Custom)task.getUtilizationModelCpu()).predictUtilization(vmArray.get(j).getVmType());
+				double targetVmCapacity = (double)100 - vmArray.get(j).getCloudletScheduler().getTotalUtilizationOfCpu(CloudSim.clock());
+				if(requiredCapacity <= targetVmCapacity) {
+					selectedVM = vmArray.get(0);
 					}
-			 }
-		
-		}
-		
-		Arrays.sort(probContainer);
-		
-		/*
-		SimLogger.printLine(" Number of neighbour "+ neighboringBS.size());
-
-		for(int j=neighboringBS.size()-1;j>=0;j--) {
+				}
+		 }
+		else {
+			List<EdgeVM> recvmArray = receivingBS.getVmList();
 			
-			SimLogger.printLine( " probability in DC "+ neighboringBS.get(j)+" is "+ probContainer[j]);
-		}
-		
-		SimLogger.printLine("");
-		SimLogger.printLine("");
-		*/
-		
-		if(selectedVM == null) {
+			for(int j = 0; j < recvmArray.size(); j++) {
+				double requiredCapacity = ((CpuUtilizationModel_Custom)task.getUtilizationModelCpu()).predictUtilization(recvmArray.get(j).getVmType());
+				double targetVmCapacity = (double)100 - recvmArray.get(j).getCloudletScheduler().getTotalUtilizationOfCpu(CloudSim.clock());
+				if(requiredCapacity <= targetVmCapacity) {
+					selectedVM = recvmArray.get(j);
+					}
+			}
 			
-			SimLogger.printLine("Selected VM is NULL");
 		}
+		
 		
 		neighboringBS.clear();
 		return selectedVM;
@@ -330,11 +343,11 @@ public class BasicEdgeOrchestrator extends EdgeOrchestrator {
 			if(compValue > tmpValue) {
 				compValue = tmpValue;
 				mectDC = i;
-				double ddll = SimManager.getInstance().getEdgeOrchestrator().deadline(task, matrix, 0.0,mectDC);
+				//double ddll = SimManager.getInstance().getEdgeOrchestrator().deadline(task, matrix, 0.0,mectDC);
 				double mectComD = SimManager.getInstance().getNetworkModel().getUploadDelay(task.getMobileDeviceId(), mectDC ,task.getCloudletFileSize())+SimManager.getInstance().getNetworkModel().getDownloadDelay(mectDC, task.getMobileDeviceId(), task.getCloudletFileSize());
 				
-				double last = ddll-mectComD;
-				task.setDeadLine(last);
+				//double last = ddll-mectComD;
+				task.setDeadLine(task.getDeadLine()-mectComD);
 				
 			}
 		}

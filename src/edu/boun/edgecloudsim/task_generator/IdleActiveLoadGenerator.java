@@ -42,6 +42,8 @@ public class IdleActiveLoadGenerator extends LoadGeneratorModel{
 		
 		File file = new File("/home/c00303945/ResearchWork/Fall_2018/EdgeCloudSim/AnnSimulation/Latest/EdgeCloudSim_A/denseArrival1.dat");
         
+		//File file = new File("/work/razin/AnnaV2I_Fall18/denseArrival1.dat");
+		
 	    BufferedReader br = null;
 		try {
 			br = new BufferedReader(new FileReader(file));
